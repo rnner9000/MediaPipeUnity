@@ -203,7 +203,7 @@ http_archive(
 # KleidiAI is needed to get the best possible performance out of XNNPack
 http_archive(
     name = "KleidiAI",
-    sha256 = "ad37707084a6d4ff41be10cbe8540c75bea057ba79d0de6c367c1bfac6ba0852",
+    sha256 = "8eeb81ff6bc7ab2de678c0c4a3d18b02c382a5122ac4edc26a3334c858531739",
     strip_prefix = "kleidiai-40a926833857fb64786e02f97703e42b1537cb57",
     urls = [
         "https://gitlab.arm.com/kleidi/kleidiai/-/archive/40a926833857fb64786e02f97703e42b1537cb57/kleidiai-40a926833857fb64786e02f97703e42b1537cb57.zip",
