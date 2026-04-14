@@ -5,22 +5,57 @@
 // https://opensource.org/licenses/MIT.
 
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Mediapipe.Unity.Sample.InstantMotionTracking
 {
+  /// <summary>
+  ///   Simple Instant Motion Tracking demo.
+  ///
+  ///   Tap / click on the camera feed to drop an AR cube.
+  ///   The graph tracks it across frames using MediaPipe region tracking.
+  ///   Each cube is repositioned every frame based on the tracked anchor data.
+  /// </summary>
   public class InstantMotionTrackingSolution : LegacySolutionRunner<InstantMotionTrackingGraph>
   {
-    private Texture2D _outputTexture;
+    [Tooltip("Prefab spawned at each tracked anchor position (falls back to a plain cube).")]
+    [SerializeField] private GameObject _stickerPrefab;
+
+    [Tooltip("Distance in front of the camera (world units) where stickers are placed.")]
+    [SerializeField] private float _stickerDepth = 5f;
+
+    // ── Internal state ────────────────────────────────────────────────────────
+
     private Experimental.TextureFramePool _textureFramePool;
+
+    /// <summary>All anchors the user has placed; sent to the graph every frame.</summary>
+    private readonly List<StickerAnchor> _anchors = new List<StickerAnchor>();
+
+    /// <summary>GameObjects representing each sticker, keyed by sticker_id.</summary>
+    private readonly Dictionary<int, GameObject> _stickerObjects = new Dictionary<int, GameObject>();
+
+    private int _nextStickerId = 0;
+
+    // ── LegacySolutionRunner ──────────────────────────────────────────────────
 
     public override void Stop()
     {
       base.Stop();
+
       _textureFramePool?.Dispose();
       _textureFramePool = null;
-      Destroy(_outputTexture);
+
+      foreach (var go in _stickerObjects.Values)
+      {
+        if (go != null)
+        {
+          Destroy(go);
+        }
+      }
+      _stickerObjects.Clear();
+      _anchors.Clear();
     }
 
     protected override IEnumerator Run()
@@ -36,39 +71,10 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking
         yield break;
       }
 
-      // Use RGBA32 as the input format.
-      // TODO: When using GpuBuffer, MediaPipe assumes that the input format is BGRA, so the following code must be fixed.
-      _textureFramePool = new Experimental.TextureFramePool(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, 10);
+      _textureFramePool = new Experimental.TextureFramePool(
+        imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, 10);
 
-      // NOTE: The screen will be resized later, keeping the aspect ratio.
-      screen.Resize(imageSource.textureWidth, imageSource.textureHeight);
-      screen.Rotate(imageSource.rotation.Reverse());
-
-      // NOTE: we can share the GL context of the render thread with MediaPipe (for now, only on Android)
-      var canUseGpuImage = graphRunner.configType == GraphRunner.ConfigType.OpenGLES && GpuManager.GpuResources != null;
-      using var glContext = canUseGpuImage ? GpuManager.GetGlContext() : null;
-
-      // Setup output texture
-      if (canUseGpuImage)
-      {
-        if (_textureFramePool.TryGetTextureFrame(out var textureFrame))
-        {
-          textureFrame.RemoveAllReleaseListeners();
-          graphRunner.SetupOutputPacket(textureFrame, glContext);
-
-          // MediaPipe will write the result to the textureFrame
-          screen.texture = Texture2D.CreateExternalTexture(textureFrame.width, textureFrame.height, textureFrame.format, false, false, textureFrame.GetNativeTexturePtr());
-        }
-        else
-        {
-          throw new InternalException("Failed to get the output texture");
-        }
-      }
-      else
-      {
-        _outputTexture = new Texture2D(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, false);
-        screen.texture = _outputTexture;
-      }
+      screen.Initialize(imageSource);
 
       yield return graphInitRequest;
       if (graphInitRequest.isError)
@@ -79,7 +85,11 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking
 
       graphRunner.StartRun(imageSource);
 
-      var waitForEndOfFrame = new WaitForEndOfFrame();
+      AsyncGPUReadbackRequest req = default;
+      var waitUntilReqDone = new WaitUntil(() => req.done);
+
+      // Sentinel for the current frame: -1 = nothing changed.
+      var frameSentinel = -1;
 
       while (true)
       {
@@ -88,40 +98,91 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking
           yield return new WaitWhile(() => isPaused);
         }
 
+        // ── Handle tap / click to place a new sticker ────────────────────────
+        if (Input.GetMouseButtonDown(0))
+        {
+          var tapPos = Input.mousePosition;
+          var anchor = new StickerAnchor
+          {
+            x = tapPos.x / UnityEngine.Screen.width,
+            y = 1f - (tapPos.y / UnityEngine.Screen.height),  // flip Y: MediaPipe is top-down
+            z = 1f,
+            stickerId = _nextStickerId++
+          };
+
+          _anchors.Add(anchor);
+          frameSentinel = anchor.stickerId;
+
+          // Spawn the sticker GameObject
+          var go = _stickerPrefab != null
+            ? Instantiate(_stickerPrefab)
+            : GameObject.CreatePrimitive(PrimitiveType.Cube);
+          go.transform.localScale = Vector3.one * 0.3f;
+          _stickerObjects[anchor.stickerId] = go;
+        }
+
+        // ── Feed the camera frame into the graph ─────────────────────────────
         if (!_textureFramePool.TryGetTextureFrame(out var textureFrame))
         {
-          yield return null;
+          yield return new WaitForEndOfFrame();
           continue;
         }
 
-        yield return waitForEndOfFrame;
-        // Copy current image to TextureFrame
-        if (canUseGpuImage)
-        {
-          textureFrame.ReadTextureOnGPU(imageSource.GetCurrentTexture());
-        }
-        else
-        {
-          textureFrame.ReadTextureOnCPU(imageSource.GetCurrentTexture(), false, imageSource.isVerticallyFlipped);
-        }
+        req = textureFrame.ReadTextureAsync(imageSource.GetCurrentTexture(), false, imageSource.isVerticallyFlipped);
+        yield return waitUntilReqDone;
 
-        graphRunner.AddTextureFrameToInputStream(textureFrame, glContext);
-
-        if (graphRunner.configType == GraphRunner.ConfigType.OpenGLES)
+        if (req.hasError)
         {
+          Debug.LogWarning("Failed to read texture from image source");
+          yield return new WaitForEndOfFrame();
           continue;
         }
+
+        graphRunner.AddTextureFrameToInputStream(textureFrame);
+        graphRunner.SendAnchorInputs(frameSentinel, _anchors.ToArray());
+        frameSentinel = -1;
+
+        // ── Read results (synchronous mode) ──────────────────────────────────
+        screen.ReadSync(textureFrame);
 
         var task = graphRunner.WaitNextAsync();
         yield return new WaitUntil(() => task.IsCompleted);
 
-        var imageFrame = task.Result;
-        if (imageFrame != null)
+        if (task.Result != null)
         {
-          _outputTexture.LoadRawTextureData(imageFrame.MutablePixelData(), imageFrame.PixelDataSize());
-          _outputTexture.Apply();
-          imageFrame.Dispose();
+          UpdateStickerPositions(task.Result);
         }
+      }
+    }
+
+    // ── Sticker positioning ───────────────────────────────────────────────────
+
+    /// <summary>
+    ///   Re-position each sticker GameObject according to the tracked anchor data.
+    ///   Anchor x/y are normalised [0,1] image coords; they are projected onto the
+    ///   main camera frustum at <see cref="_stickerDepth"/>.
+    /// </summary>
+    private void UpdateStickerPositions(List<StickerAnchor> trackedAnchors)
+    {
+      var cam = Camera.main;
+      if (cam == null)
+      {
+        return;
+      }
+
+      foreach (var anchor in trackedAnchors)
+      {
+        if (!_stickerObjects.TryGetValue(anchor.stickerId, out var go) || go == null)
+        {
+          continue;
+        }
+
+        // Viewport point: x/y normalised, z = distance from camera
+        var viewportPoint = new Vector3(anchor.x, 1f - anchor.y, _stickerDepth);
+        go.transform.position = cam.ViewportToWorldPoint(viewportPoint);
+
+        // anchor.z is a scale factor centred around 1.0
+        go.transform.localScale = Vector3.one * (0.3f * anchor.z);
       }
     }
   }

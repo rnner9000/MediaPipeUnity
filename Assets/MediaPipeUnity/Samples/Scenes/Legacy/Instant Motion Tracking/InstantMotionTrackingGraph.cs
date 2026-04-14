@@ -5,29 +5,38 @@
 // https://opensource.org/licenses/MIT.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Mediapipe.Unity.Sample.InstantMotionTracking
 {
   public class InstantMotionTrackingGraph : GraphRunner
   {
-    private const string _InputStreamName = "input_video";
+    // ── Input stream names ──────────────────────────────────────────────────
+    private const string _VideoStreamName = "input_video";
+    private const string _SentinelStreamName = "sticker_sentinel";
+    private const string _InitialAnchorStreamName = "initial_anchor_data";
 
-    private Packet<GpuBuffer> _outputGpuBufferPacket;
-    private string _destinationBufferName;
-    private Experimental.TextureFrame _destinationTexture;
+    // ── Output stream name ──────────────────────────────────────────────────
+    private const string _TrackedAnchorStreamName = "tracked_anchor_data";
 
-    private const string _OutputVideoStreamName = "output_video";
-    private OutputStream<ImageFrame> _outputVideoStream;
+    private OutputStream<List<StickerAnchor>> _trackedAnchorStream;
+
+    // ── Output event ────────────────────────────────────────────────────────
+    public event EventHandler<OutputStream<List<StickerAnchor>>.OutputEventArgs> OnTrackedAnchorsOutput
+    {
+      add => _trackedAnchorStream.AddListener(value, timeoutMicrosec);
+      remove => _trackedAnchorStream.RemoveListener(value);
+    }
+
+    // ── GraphRunner overrides ───────────────────────────────────────────────
 
     public override void StartRun(ImageSource imageSource)
     {
-      if (configType != ConfigType.OpenGLES)
+      if (runningMode.IsSynchronous())
       {
-        _outputVideoStream.StartPolling();
+        _trackedAnchorStream.StartPolling();
       }
       StartRun(BuildSidePacket(imageSource));
     }
@@ -35,82 +44,58 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking
     public override void Stop()
     {
       base.Stop();
-      _outputVideoStream?.Dispose();
-      _outputVideoStream = null;
-    }
-
-    public override IEnumerator Initialize(RunningMode runningMode)
-    {
-      if (runningMode == RunningMode.Async)
-      {
-        throw new ArgumentException("Asynchronous mode is not supported");
-      }
-      return base.Initialize(runningMode);
-    }
-
-    public void SetupOutputPacket(Experimental.TextureFrame textureFrame, GlContext glContext)
-    {
-      if (configType != ConfigType.OpenGLES)
-      {
-        throw new InvalidOperationException("This method is only supported for OpenGL ES");
-      }
-      _destinationTexture = textureFrame;
-      _outputGpuBufferPacket = Packet.CreateGpuBuffer(_destinationTexture.BuildGpuBuffer(glContext));
-    }
-
-    public void AddTextureFrameToInputStream(Experimental.TextureFrame textureFrame, GlContext glContext = null)
-    {
-      AddTextureFrameToInputStream(_InputStreamName, textureFrame, glContext);
-    }
-
-    public async Task<ImageFrame> WaitNextAsync()
-    {
-      var result = await _outputVideoStream.WaitNextAsync();
-      AssertResult(result);
-
-      _ = TryGetValue(result.packet, out var outputVideo, (packet) =>
-      {
-        return packet.Get();
-      });
-      return outputVideo;
+      _trackedAnchorStream?.Dispose();
+      _trackedAnchorStream = null;
     }
 
     protected override void ConfigureCalculatorGraph(CalculatorGraphConfig config)
     {
-      if (configType == ConfigType.OpenGLES)
-      {
-        var sinkNode = config.Node.Last((node) => node.Calculator == "GlScalerCalculator");
-        _destinationBufferName = Tool.GetUnusedSidePacketName(config, "destination_buffer");
-
-        sinkNode.InputSidePacket.Add($"DESTINATION:{_destinationBufferName}");
-      }
-
-      _outputVideoStream = new OutputStream<ImageFrame>(calculatorGraph, _OutputVideoStreamName, true);
-
+      _trackedAnchorStream = new OutputStream<List<StickerAnchor>>(calculatorGraph, _TrackedAnchorStreamName, true);
       calculatorGraph.Initialize(config);
     }
 
-    protected override IList<WaitForResult> RequestDependentAssets()
+    protected override IList<WaitForResult> RequestDependentAssets() => new List<WaitForResult>();
+
+    // ── Input helpers ────────────────────────────────────────────────────────
+
+    /// <summary>Send the camera frame into the graph.</summary>
+    public void AddTextureFrameToInputStream(Experimental.TextureFrame textureFrame)
     {
-      return new List<WaitForResult> {
-        WaitForAsset("anchor_vertices.bytes"),
-        WaitForAsset("box_trackers_vertices.bytes"),
-        WaitForAsset("box_trackers_triangles.bytes"),
-      };
+      AddTextureFrameToInputStream(_VideoStreamName, textureFrame);
     }
+
+    /// <summary>
+    ///   Send the sticker sentinel and the full list of current anchors.
+    ///   Call once per frame after <see cref="AddTextureFrameToInputStream"/>.
+    /// </summary>
+    /// <param name="sentinelStickerId">
+    ///   ID of the sticker whose anchor was just changed/added, or -1 when nothing changed.
+    /// </param>
+    /// <param name="anchors">All currently active anchors.</param>
+    public void SendAnchorInputs(int sentinelStickerId, StickerAnchor[] anchors)
+    {
+      AddPacketToInputStream(_SentinelStreamName, Packet.CreateIntAt(sentinelStickerId, latestTimestamp));
+      AddPacketToInputStream(_InitialAnchorStreamName, PacketAnchorExtension.CreateAnchorVectorAt(anchors, latestTimestamp));
+    }
+
+    // ── Output helpers ───────────────────────────────────────────────────────
+
+    /// <summary>Wait for the next result (synchronous running mode only).</summary>
+    public async Task<List<StickerAnchor>> WaitNextAsync()
+    {
+      var result = await _trackedAnchorStream.WaitNextAsync();
+      AssertResult(result);
+
+      _ = TryGetValue(result.packet, out var trackedAnchors, (packet) => packet.Get());
+      return trackedAnchors;
+    }
+
+    // ── Side packets ─────────────────────────────────────────────────────────
 
     private PacketMap BuildSidePacket(ImageSource imageSource)
     {
       var sidePacket = new PacketMap();
-
-      SetImageTransformationOptions(sidePacket, imageSource, true);
-      sidePacket.Emplace("output_rotation", Packet.CreateInt((int)imageSource.rotation));
-
-      if (configType == ConfigType.OpenGLES)
-      {
-        sidePacket.Emplace(_destinationBufferName, _outputGpuBufferPacket);
-      }
-
+      SetImageTransformationOptions(sidePacket, imageSource);
       return sidePacket;
     }
   }
