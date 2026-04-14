@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != 'master' }}
 jobs:
   check-test-trigger:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci:run')
     steps:
       - uses: actions-ecosystem/action-remove-labels@v1
