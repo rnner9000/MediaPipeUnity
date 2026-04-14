@@ -4,125 +4,73 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
+using Mediapipe.Unity.CoordinateSystem;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 
-namespace Mediapipe.Unity.Sample.InstantMotionTracking
+namespace LegacyIO
 {
-  public class InstantMotionTrackingSolution : LegacySolutionRunner<InstantMotionTrackingGraph>
+  public class InstantMotionTrackingSolution : ImageSourceSolution<RegionTrackingGraph>
   {
-    private Texture2D _outputTexture;
-    private Experimental.TextureFramePool _textureFramePool;
+    [SerializeField] private Anchor3dAnnotationController _trackedAnchorDataAnnotationController;
 
-    public override void Stop()
+    private void Update()
     {
-      base.Stop();
-      _textureFramePool?.Dispose();
-      _textureFramePool = null;
-      Destroy(_outputTexture);
+      if (Input.GetMouseButtonDown(0))
+      {
+        var rectTransform = screen.GetComponent<RectTransform>();
+
+        if (RectTransformUtility.RectangleContainsScreenPoint(rectTransform, Input.mousePosition, Camera.main))
+        {
+          if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, Input.mousePosition, Camera.main, out var localPoint))
+          {
+            var isMirrored = ImageSourceProvider.ImageSource.isFrontFacing ^ ImageSourceProvider.ImageSource.isHorizontallyFlipped;
+            var normalizedPoint = rectTransform.rect.PointToImageNormalized(localPoint, graphRunner.rotation, isMirrored);
+            graphRunner.ResetAnchor(normalizedPoint.x, normalizedPoint.y);
+            _trackedAnchorDataAnnotationController.ResetAnchor();
+          }
+        }
+      }
     }
 
-    protected override IEnumerator Run()
+    protected override void OnStartRun()
     {
-      var graphInitRequest = graphRunner.WaitForInit(runningMode);
-      var imageSource = ImageSourceProvider.ImageSource;
+      graphRunner.ResetAnchor();
 
-      yield return imageSource.Play();
-
-      if (!imageSource.isPrepared)
+      if (!runningMode.IsSynchronous())
       {
-        Debug.LogError("Failed to start ImageSource, exiting...");
-        yield break;
+        graphRunner.OnTrackedAnchorDataOutput += OnTrackedAnchorDataOutput;
       }
 
-      // Use RGBA32 as the input format.
-      // TODO: When using GpuBuffer, MediaPipe assumes that the input format is BGRA, so the following code must be fixed.
-      _textureFramePool = new Experimental.TextureFramePool(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, 10);
+      SetupAnnotationController(_trackedAnchorDataAnnotationController, ImageSourceProvider.ImageSource);
+      _trackedAnchorDataAnnotationController.ResetAnchor();
+    }
 
-      // NOTE: The screen will be resized later, keeping the aspect ratio.
-      screen.Resize(imageSource.textureWidth, imageSource.textureHeight);
-      screen.Rotate(imageSource.rotation.Reverse());
+    protected override void AddTextureFrameToInputStream(TextureFrame textureFrame)
+    {
+      graphRunner.AddTextureFrameToInputStream(textureFrame);
+    }
 
-      // NOTE: we can share the GL context of the render thread with MediaPipe (for now, only on Android)
-      var canUseGpuImage = graphRunner.configType == GraphRunner.ConfigType.OpenGLES && GpuManager.GpuResources != null;
-      using var glContext = canUseGpuImage ? GpuManager.GetGlContext() : null;
+    protected override IEnumerator WaitForNextValue()
+    {
+      List<Anchor3d> trackedAnchorData = null;
 
-      // Setup output texture
-      if (canUseGpuImage)
+      if (runningMode == RunningMode.Sync)
       {
-        if (_textureFramePool.TryGetTextureFrame(out var textureFrame))
-        {
-          textureFrame.RemoveAllReleaseListeners();
-          graphRunner.SetupOutputPacket(textureFrame, glContext);
-
-          // MediaPipe will write the result to the textureFrame
-          screen.texture = Texture2D.CreateExternalTexture(textureFrame.width, textureFrame.height, textureFrame.format, false, false, textureFrame.GetNativeTexturePtr());
-        }
-        else
-        {
-          throw new InternalException("Failed to get the output texture");
-        }
+        var _ = graphRunner.TryGetNext(out trackedAnchorData, true);
       }
-      else
+      else if (runningMode == RunningMode.NonBlockingSync)
       {
-        _outputTexture = new Texture2D(imageSource.textureWidth, imageSource.textureHeight, TextureFormat.RGBA32, false);
-        screen.texture = _outputTexture;
+        yield return new WaitUntil(() => graphRunner.TryGetNext(out trackedAnchorData, false));
       }
 
-      yield return graphInitRequest;
-      if (graphInitRequest.isError)
-      {
-        Debug.LogError(graphInitRequest.error);
-        yield break;
-      }
+      _trackedAnchorDataAnnotationController.DrawNow(trackedAnchorData);
+    }
 
-      graphRunner.StartRun(imageSource);
-
-      var waitForEndOfFrame = new WaitForEndOfFrame();
-
-      while (true)
-      {
-        if (isPaused)
-        {
-          yield return new WaitWhile(() => isPaused);
-        }
-
-        if (!_textureFramePool.TryGetTextureFrame(out var textureFrame))
-        {
-          yield return null;
-          continue;
-        }
-
-        yield return waitForEndOfFrame;
-        // Copy current image to TextureFrame
-        if (canUseGpuImage)
-        {
-          textureFrame.ReadTextureOnGPU(imageSource.GetCurrentTexture());
-        }
-        else
-        {
-          textureFrame.ReadTextureOnCPU(imageSource.GetCurrentTexture(), false, imageSource.isVerticallyFlipped);
-        }
-
-        graphRunner.AddTextureFrameToInputStream(textureFrame, glContext);
-
-        if (graphRunner.configType == GraphRunner.ConfigType.OpenGLES)
-        {
-          continue;
-        }
-
-        var task = graphRunner.WaitNextAsync();
-        yield return new WaitUntil(() => task.IsCompleted);
-
-        var imageFrame = task.Result;
-        if (imageFrame != null)
-        {
-          _outputTexture.LoadRawTextureData(imageFrame.MutablePixelData(), imageFrame.PixelDataSize());
-          _outputTexture.Apply();
-          imageFrame.Dispose();
-        }
-      }
+    private void OnTrackedAnchorDataOutput(object stream, OutputEventArgs<List<Anchor3d>> eventArgs)
+    {
+      _trackedAnchorDataAnnotationController.DrawLater(eventArgs.value);
     }
   }
 }

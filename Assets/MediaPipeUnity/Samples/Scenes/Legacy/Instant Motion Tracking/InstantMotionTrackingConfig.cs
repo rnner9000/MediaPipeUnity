@@ -5,12 +5,12 @@
 // https://opensource.org/licenses/MIT.
 
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using Mediapipe.Unity.Sample.UI;
+using Mediapipe.Unity.UI;
 
-namespace Mediapipe.Unity.Sample.InstantMotionTracking.UI
+namespace LegacyIO
 {
   public class InstantMotionTrackingConfig : ModalContents
   {
@@ -34,13 +34,6 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking.UI
       GetModal().CloseAndResume(_isChanged);
     }
 
-    public void SwitchRunningMode()
-    {
-      var text = _runningModeInput.options[_runningModeInput.value].text;
-      _solution.runningMode = (RunningMode)Enum.Parse(typeof(RunningMode), text);
-      _isChanged = true;
-    }
-
     public void SetTimeoutMillisec()
     {
       if (int.TryParse(_timeoutMillisecInput.text, out var value))
@@ -50,10 +43,16 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking.UI
       }
     }
 
+    public void SwitchRunningMode()
+    {
+      _solution.runningMode = (RunningMode)_runningModeInput.value;
+      _isChanged = true;
+    }
+
     private void InitializeContents()
     {
-      InitializeRunningMode();
       InitializeTimeoutMillisec();
+      InitializeRunningMode();
     }
 
     private void InitializeRunningMode()
@@ -61,7 +60,7 @@ namespace Mediapipe.Unity.Sample.InstantMotionTracking.UI
       _runningModeInput = gameObject.transform.Find(_RunningModePath).gameObject.GetComponent<Dropdown>();
       _runningModeInput.ClearOptions();
 
-      var options = Enum.GetNames(typeof(RunningMode)).Where((name) => name != RunningMode.Async.ToString()).ToList();
+      var options = new List<string>(Enum.GetNames(typeof(RunningMode)));
       _runningModeInput.AddOptions(options);
 
       var currentRunningMode = _solution.runningMode;
