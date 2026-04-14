@@ -36,7 +36,7 @@ on:
 
 jobs:
   print-inputs:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Print inputs for debug
         run: |
@@ -49,7 +49,7 @@ jobs:
           echo 'inputs.windowsBuildArgs=${{ inputs.windowsBuildArgs }}'
 
   linux-build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,7 +78,7 @@ jobs:
           path: .
 
   android-build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
         with:
@@ -164,7 +164,7 @@ jobs:
           path: Packages/com.github.homuler.mediapipe/Runtime/Plugins/iOS
 
   windows-build:
-    runs-on: windows-2022
+    runs-on: blacksmith-4vcpu-windows-2025
     steps:
       - uses: actions/checkout@v4
         with:
@@ -194,7 +194,7 @@ jobs:
           path: Packages/com.github.homuler.mediapipe/Runtime/Plugins/mediapipe_c.dll*
 
   package:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - linux-build
       - android-build
@@ -333,7 +333,7 @@ jobs:
           retention-days: 7
 
   clean:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - package
     steps:
