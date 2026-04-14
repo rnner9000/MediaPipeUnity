@@ -1,0 +1,45 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        type: string
+        description: Git reference (branch/tag) to build
+        default: 'main'
+      bazelBuildArgs:
+        type: string
+        description: Bazel build options
+        default: '--experimental_scale_timeouts=10.0 --http_timeout_scaling=10.0'
+      iosBuildArgs:
+        type: string
+        required: false
+        default: '--ios arm64 --opencv cmake'
+        description: Build options for iOS Build (skip if empty)
+
+jobs:
+  ios-build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Setup Python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install NumPy
+        run: pip install --no-cache-dir --user numpy
+
+      - name: Build MediaPipeUnity.framework
+        if: ${{ inputs.iosBuildArgs != '' }}
+        run: |
+          unset ANDROID_NDK_HOME
+          python build.py build --bazel_build_opts="${{ inputs.bazelBuildArgs }}" ${{ inputs.iosBuildArgs }} -vv
+
+      - name: Upload MediaPipeUnity.framework
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: Packages/com.github.homuler.mediapipe/Runtime/Plugins/iOS
