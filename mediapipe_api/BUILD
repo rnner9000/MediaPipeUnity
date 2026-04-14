@@ -481,11 +481,11 @@ cc_library(
 cc_library(
     name = "box_tracking_calculators",
     deps = select({
-        "@com_google_mediapipe//mediapipe/gpu:disable_gpu": [
-            "@com_google_mediapipe//mediapipe/graphs/tracking:desktop_calculators",
+        "@mediapipe//mediapipe/gpu:disable_gpu": [
+            "@mediapipe//mediapipe/graphs/tracking:desktop_calculators",
         ],
         "//conditions:default": [
-            "@com_google_mediapipe//mediapipe/graphs/tracking:mobile_calculators",
+            "@mediapipe//mediapipe/graphs/tracking:mobile_calculators",
         ],
     }),
 )
@@ -493,11 +493,11 @@ cc_library(
 cc_library(
     name = "instant_motion_tracking_calculators",
     deps = select({
-        "@com_google_mediapipe//mediapipe/gpu:disable_gpu": [
+        "@mediapipe//mediapipe/gpu:disable_gpu": [
             "//mediapipe_api/graphs/instant_motion_tracking/subgraphs:region_tracking_cpu",
         ],
         "//conditions:default": [
-            "@com_google_mediapipe//mediapipe/graphs/instant_motion_tracking:instant_motion_tracking_deps",
+            "@mediapipe//mediapipe/graphs/instant_motion_tracking:instant_motion_tracking_deps",
         ],
     }),
 )
@@ -711,15 +711,15 @@ filegroup(
 filegroup(
     name = "box_tracking_assets",
     srcs = [
-        "@com_google_mediapipe//mediapipe/models:ssdlite_object_detection.tflite",
-        "@com_google_mediapipe//mediapipe/models:ssdlite_object_detection_labelmap.txt",
+        "@mediapipe//mediapipe/models:ssdlite_object_detection.tflite",
+        "@mediapipe//mediapipe/models:ssdlite_object_detection_labelmap.txt",
     ],
 )
 
 filegroup(
     name = "instant_motion_tracking_assets",
     srcs = [
-        "@com_google_mediapipe//mediapipe/models:ssdlite_object_detection.tflite",
+        "@mediapipe//mediapipe/models:ssdlite_object_detection.tflite",
     ],
 )
 

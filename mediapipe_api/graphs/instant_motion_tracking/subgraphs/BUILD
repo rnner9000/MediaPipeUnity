@@ -5,7 +5,7 @@
 # https://opensource.org/licenses/MIT.
 
 load(
-    "@com_google_mediapipe//mediapipe/framework/tool:mediapipe_graph.bzl",
+    "@mediapipe//mediapipe/framework/tool:mediapipe_graph.bzl",
     "mediapipe_simple_subgraph",
 )
 
@@ -16,7 +16,7 @@ mediapipe_simple_subgraph(
     graph = "region_tracking_cpu.pbtxt",
     register_as = "RegionTrackingSubgraphCpu",
     deps = [
-        "@com_google_mediapipe//mediapipe/graphs/instant_motion_tracking/calculators:tracked_anchor_manager_calculator",
-        "@com_google_mediapipe//mediapipe/graphs/tracking/subgraphs:box_tracking_cpu",
+        "@mediapipe//mediapipe/graphs/instant_motion_tracking/calculators:tracked_anchor_manager_calculator",
+        "@mediapipe//mediapipe/graphs/tracking/subgraphs:box_tracking_cpu",
     ],
 )
