@@ -1,0 +1,50 @@
+name: Build Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        type: string
+        description: Git reference (branch/tag) to build
+        default: 'main'
+      bazelBuildArgs:
+        type: string
+        description: Bazel build options
+        default: '--experimental_scale_timeouts=10.0 --http_timeout_scaling=10.0'
+      androidBuildArgs:
+        type: string
+        required: false
+        default: '--android arm64 --android_ndk_api_level 21'
+        description: Build options for Android Build (skip if empty)
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Build a Docker image
+        if: ${{ inputs.androidBuildArgs != '' }}
+        run: |
+          docker build --no-cache --build-arg UID=$(id -u) -t mediapipe_unity:latest . -f docker/linux/x86_64/Dockerfile
+
+      - name: Remove unused files to free up space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android
+
+      - name: Build
+        if: ${{ inputs.androidBuildArgs != '' }}
+        run: |
+          docker run --rm \
+            --mount type=bind,src=$PWD/Packages,dst=/home/mediapipe/Packages \
+            --mount type=bind,src=$PWD/Assets,dst=/home/mediapipe/Assets \
+            mediapipe_unity:latest \
+            python build.py build --bazel_build_opts="${{ inputs.bazelBuildArgs }}" ${{ inputs.androidBuildArgs }} -vv
+
+      - name: Upload mediapipe_android.aar
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: Packages/com.github.homuler.mediapipe/Runtime/Plugins/Android

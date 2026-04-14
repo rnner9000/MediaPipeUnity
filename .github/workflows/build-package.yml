@@ -2,47 +2,99 @@ name: Build a Package
 on:
   workflow_dispatch:
     inputs:
+      ref:
+        type: string
+        description: Git reference (branch/tag) to build
+        default: 'main'
       bazelBuildArgs:
         type: string
         description: A value for `--bazel_build_opts`
         default: '--experimental_scale_timeouts=10.0 --http_timeout_scaling=10.0'
+      buildLinux:
+        type: boolean
+        description: Build Linux package
+        default: true
       linuxBuildArgs:
         type: string
         required: false
-        default: ''
+        default: '--desktop gpu --opencv cmake'
         description: Build options for Linux Build (skip if empty)
+      buildAndroid:
+        type: boolean
+        description: Build Android package
+        default: true
       androidBuildArgs:
         type: string
         required: false
-        default: ''
+        default: '--android arm64 --android_ndk_api_level 21'
         description: Build options for Android Build (skip if empty)
+      buildMacOS:
+        type: boolean
+        description: Build macOS package
+        default: true
       macosBuildArgs:
         type: string
         required: false
         default: '--desktop cpu --opencv cmake --macos_universal'
         description: Build options for macOS Build (skip if empty)
+      buildiOS:
+        type: boolean
+        description: Build iOS package
+        default: true
       iosBuildArgs:
         type: string
         required: false
-        default: ''
+        default: '--ios arm64 --opencv cmake'
         description: Build options for iOS Build (skip if empty)
+      buildWindows:
+        type: boolean
+        description: Build Windows package
+        default: true
       windowsBuildArgs:
         type: string
         required: false
-        default: ''
+        default: '--desktop cpu --opencv cmake'
         description: Build options for Windows Build (skip if empty)
   schedule:
     - cron: 0 12 * * 0,3
+
 jobs:
-  package:
-    uses: ./.github/workflows/package.yml
+  build-linux:
+    if: ${{ inputs.buildLinux == true }}
+    uses: ./.github/workflows/build-linux.yml
     with:
-      ref: ${{ github.event.ref }}
-      packageName: package
+      ref: ${{ inputs.ref || github.event.ref || 'main' }}
       bazelBuildArgs: ${{ inputs.bazelBuildArgs }}
       linuxBuildArgs: ${{ inputs.linuxBuildArgs }}
+
+  build-android:
+    if: ${{ inputs.buildAndroid == true }}
+    uses: ./.github/workflows/build-android.yml
+    with:
+      ref: ${{ inputs.ref || github.event.ref || 'main' }}
+      bazelBuildArgs: ${{ inputs.bazelBuildArgs }}
       androidBuildArgs: ${{ inputs.androidBuildArgs }}
+
+  build-macos:
+    if: ${{ inputs.buildMacOS == true }}
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      ref: ${{ inputs.ref || github.event.ref || 'main' }}
+      bazelBuildArgs: ${{ inputs.bazelBuildArgs }}
       macosBuildArgs: ${{ inputs.macosBuildArgs }}
+
+  build-ios:
+    if: ${{ inputs.buildiOS == true }}
+    uses: ./.github/workflows/build-ios.yml
+    with:
+      ref: ${{ inputs.ref || github.event.ref || 'main' }}
+      bazelBuildArgs: ${{ inputs.bazelBuildArgs }}
       iosBuildArgs: ${{ inputs.iosBuildArgs }}
+
+  build-windows:
+    if: ${{ inputs.buildWindows == true }}
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      ref: ${{ inputs.ref || github.event.ref || 'main' }}
+      bazelBuildArgs: ${{ inputs.bazelBuildArgs }}
       windowsBuildArgs: ${{ inputs.windowsBuildArgs }}
-    secrets: inherit
