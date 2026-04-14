@@ -92,6 +92,20 @@ config_setting(
 )
 
 config_setting(
+    name = "box_tracking_switch",
+    flag_values = {
+        ":solutions": "box_tracking",
+    },
+)
+
+config_setting(
+    name = "instant_motion_tracking_switch",
+    flag_values = {
+        ":solutions": "instant_motion_tracking",
+    },
+)
+
+config_setting(
     name = "gesture_recognition_switch",
     flag_values = {
         ":solutions": "gesture_recognition",
@@ -146,6 +160,16 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "enable_box_tracking",
+    match_any = [":all_solutions_switch", ":box_tracking_switch"],
+)
+
+selects.config_setting_group(
+    name = "enable_instant_motion_tracking",
+    match_any = [":all_solutions_switch", ":instant_motion_tracking_switch"],
+)
+
+selects.config_setting_group(
     name = "enable_gesture_recognition",
     match_any = [":all_solutions_switch", ":gesture_recognition_switch"],
 )
@@ -176,6 +200,8 @@ cc_library(
         "//mediapipe_api/framework/formats:matrix",
         "//mediapipe_api/framework/formats:rect",
         "//mediapipe_api/framework/port:logging",
+        "//mediapipe_api/graphs/object_detection_3d/calculators:model_matrix",
+        "//mediapipe_api/graphs/instant_motion_tracking/calculators:transformations",
         "//mediapipe_api/tasks/c/components/containers:classification_result",
         "//mediapipe_api/tasks/c/components/containers:detection_result",
         "//mediapipe_api/tasks/c/components/containers:landmark",
@@ -321,6 +347,12 @@ cc_library(
         ":enable_object_detection": [":object_detection_calculators"],
         "//conditions:default": [],
     }) + select({
+        ":enable_box_tracking": [":box_tracking_calculators"],
+        "//conditions:default": [],
+    }) + select({
+        ":enable_instant_motion_tracking": [":instant_motion_tracking_calculators"],
+        "//conditions:default": [],
+    }) + select({
         ":enable_gesture_recognition": [":gesture_recognition_calculators"],
         "//conditions:default": [],
     }) + select({
@@ -448,6 +480,30 @@ cc_library(
 )
 
 cc_library(
+    name = "box_tracking_calculators",
+    deps = select({
+        "@com_google_mediapipe//mediapipe/gpu:disable_gpu": [
+            "@com_google_mediapipe//mediapipe/graphs/tracking:desktop_calculators",
+        ],
+        "//conditions:default": [
+            "@com_google_mediapipe//mediapipe/graphs/tracking:mobile_calculators",
+        ],
+    }),
+)
+
+cc_library(
+    name = "instant_motion_tracking_calculators",
+    deps = select({
+        "@com_google_mediapipe//mediapipe/gpu:disable_gpu": [
+            "//mediapipe_api/graphs/instant_motion_tracking/subgraphs:region_tracking_cpu",
+        ],
+        "//conditions:default": [
+            "@com_google_mediapipe//mediapipe/graphs/instant_motion_tracking:instant_motion_tracking_deps",
+        ],
+    }),
+)
+
+cc_library(
     name = "gesture_recognition_calculators",
     deps = [
         "@mediapipe//mediapipe/tasks/cc/vision/gesture_recognizer:gesture_recognizer",
@@ -534,6 +590,12 @@ pkg_asset(
         "//conditions:default": [],
     }) + select({
         ":enable_object_detection": [":object_detection_assets"],
+        "//conditions:default": [],
+    }) + select({
+        ":enable_box_tracking": [":box_tracking_assets"],
+        "//conditions:default": [],
+    }) + select({
+        ":enable_instant_motion_tracking": [":instant_motion_tracking_assets"],
         "//conditions:default": [],
     }) + select({
         ":enable_gesture_recognition": [":gesture_recognition_assets"],
@@ -648,6 +710,21 @@ filegroup(
 )
 
 filegroup(
+    name = "box_tracking_assets",
+    srcs = [
+        "@com_google_mediapipe//mediapipe/models:ssdlite_object_detection.tflite",
+        "@com_google_mediapipe//mediapipe/models:ssdlite_object_detection_labelmap.txt",
+    ],
+)
+
+filegroup(
+    name = "instant_motion_tracking_assets",
+    srcs = [
+        "@com_google_mediapipe//mediapipe/models:ssdlite_object_detection.tflite",
+    ],
+)
+
+filegroup(
     name = "gesture_recognition_assets",
     srcs = [
         ":gesture_recognizer.task",
@@ -677,6 +754,8 @@ pkg_zip(
         "//mediapipe_api/framework/formats/motion:proto_srcs",
         "//mediapipe_api/framework/formats/object_detection:proto_srcs",
         "//mediapipe_api/gpu:proto_srcs",
+        "//mediapipe_api/graphs/instant_motion_tracking/calculators:proto_srcs",
+        "//mediapipe_api/graphs/object_detection_3d/calculators:proto_srcs",
         "//mediapipe_api/modules/face_detection:proto_srcs",
         "//mediapipe_api/modules/holistic_landmark/calculators:proto_srcs",
         "//mediapipe_api/tasks/cc/core/proto:proto_srcs",
