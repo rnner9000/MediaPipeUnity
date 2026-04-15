@@ -1,0 +1,11 @@
+--- a/mediapipe/graphs/instant_motion_tracking/calculators/transformations.h
++++ b/mediapipe/graphs/instant_motion_tracking/calculators/transformations.h
+@@ -30,7 +30,7 @@
+ };
+ 
+ // The normalized anchor coordinates of a sticker
+-struct Anchor {
++struct StickerAnchor {
+   float x;  // [0.0-1.0]
+   float y;  // [0.0-1.0]
+   float z;  // Centered around 1.0 [current_scale = z * initial_scale]
