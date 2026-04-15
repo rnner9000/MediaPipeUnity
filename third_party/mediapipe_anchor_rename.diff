@@ -1,23 +1,18 @@
 --- a/mediapipe/graphs/instant_motion_tracking/calculators/transformations.h
 +++ b/mediapipe/graphs/instant_motion_tracking/calculators/transformations.h
-@@ -27,10 +27,12 @@ struct UserScaling {
-   int sticker_id;
+@@ -30,7 +30,7 @@
  };
  
--// The normalized anchor coordinates of a sticker
+ // The normalized anchor coordinates of a sticker
 -struct Anchor {
-+// The normalized anchor coordinates of a sticker.
-+// Named StickerAnchor to avoid an ODR collision with the proto-generated
-+// mediapipe::Anchor class from object_detection/anchor.proto.
 +struct StickerAnchor {
    float x;  // [0.0-1.0]
    float y;  // [0.0-1.0]
    float z;  // Centered around 1.0 [current_scale = z * initial_scale]
-   int sticker_id;
- };
 --- a/mediapipe/graphs/instant_motion_tracking/calculators/tracked_anchor_manager_calculator.cc
 +++ b/mediapipe/graphs/instant_motion_tracking/calculators/tracked_anchor_manager_calculator.cc
-@@ -68,7 +68,7 @@ class TrackedAnchorManagerCalculator : public CalculatorBase {
+@@ -68,7 +68,7 @@
+ class TrackedAnchorManagerCalculator : public CalculatorBase {
   private:
    // Previous graph iteration anchor data
 -  std::vector<Anchor> previous_anchor_data_;
@@ -25,7 +20,7 @@
  
   public:
    static absl::Status GetContract(CalculatorContract* cc) {
-@@ -77,14 +77,14 @@ class TrackedAnchorManagerCalculator : public CalculatorBase {
+@@ -77,14 +77,14 @@
      RET_CHECK(cc->Outputs().HasTag(kAnchorsTag) &&
                cc->Outputs().HasTag(kBoxesOutputTag));
  
@@ -42,7 +37,7 @@
      cc->Outputs().Tag(kBoxesOutputTag).Set<mediapipe::TimedBoxProtoList>();
  
      if (cc->Outputs().HasTag(kCancelTag)) {
-@@ -103,10 +103,10 @@ REGISTER_CALCULATOR(TrackedAnchorManagerCalculator);
+@@ -103,10 +103,10 @@
  absl::Status TrackedAnchorManagerCalculator::Process(CalculatorContext* cc) {
    mediapipe::Timestamp timestamp = cc->InputTimestamp();
    const int sticker_sentinel = cc->Inputs().Tag(kSentinelTag).Get<int>();
@@ -56,7 +51,7 @@
  
    // Delete any boxes being tracked without an associated anchor
    for (const mediapipe::TimedBoxProto& box :
-@@ -115,7 +115,7 @@ absl::Status TrackedAnchorManagerCalculator::Process(CalculatorContext* cc) {
+@@ -115,7 +115,7 @@
             .Get<mediapipe::TimedBoxProtoList>()
             .box()) {
      bool anchor_exists = false;
@@ -76,6 +71,15 @@
      // Check if anchor position is being reset by user in this graph iteration
      if (sticker_sentinel == anchor.sticker_id) {
        // Delete associated tracking box
+@@ -150,7 +150,7 @@
+       // Default value for normalized z (scale factor)
+       output_anchor.z = 1.0f;
+     } else {
+-      // Anchor position was not reset by user
++      // StickerAnchor position was not reset by user
+       // Attempt to update anchor position from tracking subgraph
+       // (TimedBoxProto)
+       bool updated_from_tracker = false;
 @@ -175,7 +175,7 @@
        // stickers to be tracked at approximately last location even if
        // re-acquisitioning in the BoxTrackingSubgraph encounters errors
@@ -96,7 +100,7 @@
        .Tag(kBoxesOutputTag)
 --- a/mediapipe/graphs/instant_motion_tracking/calculators/sticker_manager_calculator.cc
 +++ b/mediapipe/graphs/instant_motion_tracking/calculators/sticker_manager_calculator.cc
-@@ -61,7 +61,7 @@ class StickerManagerCalculator : public CalculatorBase {
+@@ -61,7 +61,7 @@
                cc->Outputs().HasTag(kRenderDescriptorsTag));
  
      cc->Inputs().Tag(kProtoDataString).Set<std::string>();
@@ -105,7 +109,7 @@
      cc->Outputs().Tag(kUserRotationsTag).Set<std::vector<UserRotation>>();
      cc->Outputs().Tag(kUserScalingsTag).Set<std::vector<UserScaling>>();
      cc->Outputs().Tag(kRenderDescriptorsTag).Set<std::vector<int>>();
-@@ -78,7 +78,7 @@ class StickerManagerCalculator : public CalculatorBase {
+@@ -78,7 +78,7 @@
      std::string sticker_proto_string =
          cc->Inputs().Tag(kProtoDataString).Get<std::string>();
  
@@ -122,7 +126,7 @@
 +      StickerAnchor initial_anchor;
        UserRotation user_rotation;
        UserScaling user_scaling;
- 
+       // Get individual Sticker object as defined by Protobuffer
 @@ -116,7 +116,7 @@
      if (cc->Outputs().HasTag(kAnchorsTag)) {
        cc->Outputs()
@@ -131,3 +135,4 @@
 +          .AddPacket(MakePacket<std::vector<StickerAnchor>>(initial_anchor_data)
                           .At(cc->InputTimestamp()));
      }
+     if (cc->Outputs().HasTag(kUserRotationsTag)) {
