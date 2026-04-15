@@ -30,7 +30,7 @@ namespace Mediapipe.Unity.Sample.Holistic
 
   public class InstantMotionTrackingGraph : GraphRunner
   {
-    public event EventHandler<OutputStream<List<Anchor3d>>.OutputEventArgs> OnPoseDetectionOutput
+    public event EventHandler<OutputStream<List<StickerAnchor>>.OutputEventArgs> OnPoseDetectionOutput
     {
       add => _trackedAnchorDataStream.AddListener(value, timeoutMicrosec);
       remove => _trackedAnchorDataStream.RemoveListener(value);
@@ -41,7 +41,7 @@ namespace Mediapipe.Unity.Sample.Holistic
     private const string _InitialAnchorDataStreamName = "initial_anchor_data";
     private const string _TrackedAnchorDataStreamName = "tracked_anchor_data";
 
-    private OutputStream<List<Anchor3d>> _trackedAnchorDataStream;
+    private OutputStream<List<StickerAnchor>> _trackedAnchorDataStream;
     
     private readonly Anchor3d[] _anchors = new Anchor3d[1];
 
@@ -81,18 +81,17 @@ namespace Mediapipe.Unity.Sample.Holistic
       AddPacketToInputStream(_InitialAnchorDataStreamName, PacketAnchorExtension.CreateAnchorVectorAt(_anchors, latestTimestamp));
     }
 
-    public async Task<InstantMotionTrackingResult> WaitNextAsync()
+    public async Task<List<StickerAnchor>> WaitNextAsync()
     {
       var results = await _trackedAnchorDataStream.WaitNextAsync();
       AssertResult(results);
 
       _ = TryGetValue(results.packet, out var anchors, (packet) =>
       {
-        Debug.Log(_anchors.Length);
-        return new List<Anchor3d>();
+        return PacketAnchorExtension.Get(packet);
       });
 
-      return new InstantMotionTrackingResult();
+      return anchors;
     }
 
     protected override IList<WaitForResult> RequestDependentAssets()
@@ -104,7 +103,7 @@ namespace Mediapipe.Unity.Sample.Holistic
 
     protected override void ConfigureCalculatorGraph(CalculatorGraphConfig config)
     {
-      _trackedAnchorDataStream = new OutputStream<List<Anchor3d>>(calculatorGraph, _TrackedAnchorDataStreamName, true);
+      _trackedAnchorDataStream = new OutputStream<List<StickerAnchor>>(calculatorGraph, _TrackedAnchorDataStreamName, true);
       calculatorGraph.Initialize(config);
     }
     

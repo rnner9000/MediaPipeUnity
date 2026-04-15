@@ -14,7 +14,7 @@ namespace Mediapipe.Unity.Sample.Holistic
 {
   public class InstantMotionTrackingSolution : LegacySolutionRunner<InstantMotionTrackingGraph>
   {
-    // [SerializeField] private DetectionAnnotationController _poseDetectionAnnotationController;
+    [SerializeField] private StickerAnchorAnnotation _annotation;
 
     private Experimental.TextureFramePool _textureFramePool;
 
@@ -132,12 +132,14 @@ namespace Mediapipe.Unity.Sample.Holistic
           yield return new WaitUntil(() => task.IsCompleted);
 
           var result = task.Result;
-          // _poseDetectionAnnotationController.DrawNow(result.poseDetection);
+
+          if (result.Count <= 0) continue;
+          var camera = Camera.main.transform.position;
+          _annotation.UpdateTracker(result[0], RotationAngle.Rotation0, camera, 10f);
         }
       }
-      
     }
-    private void OnPoseDetectionOutput(object stream, OutputStream<List<Anchor3d>>.OutputEventArgs eventArgs)
+    private void OnPoseDetectionOutput(object stream, OutputStream<List<StickerAnchor>>.OutputEventArgs eventArgs)
     {
       Debug.Log("hi");
       /*
