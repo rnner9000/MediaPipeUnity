@@ -1,0 +1,133 @@
+--- a/mediapipe/graphs/instant_motion_tracking/calculators/transformations.h
++++ b/mediapipe/graphs/instant_motion_tracking/calculators/transformations.h
+@@ -27,10 +27,12 @@ struct UserScaling {
+   int sticker_id;
+ };
+ 
+-// The normalized anchor coordinates of a sticker
+-struct Anchor {
++// The normalized anchor coordinates of a sticker.
++// Named StickerAnchor to avoid an ODR collision with the proto-generated
++// mediapipe::Anchor class from object_detection/anchor.proto.
++struct StickerAnchor {
+   float x;  // [0.0-1.0]
+   float y;  // [0.0-1.0]
+   float z;  // Centered around 1.0 [current_scale = z * initial_scale]
+   int sticker_id;
+ };
+--- a/mediapipe/graphs/instant_motion_tracking/calculators/tracked_anchor_manager_calculator.cc
++++ b/mediapipe/graphs/instant_motion_tracking/calculators/tracked_anchor_manager_calculator.cc
+@@ -68,7 +68,7 @@ class TrackedAnchorManagerCalculator : public CalculatorBase {
+  private:
+   // Previous graph iteration anchor data
+-  std::vector<Anchor> previous_anchor_data_;
++  std::vector<StickerAnchor> previous_anchor_data_;
+ 
+  public:
+   static absl::Status GetContract(CalculatorContract* cc) {
+@@ -77,14 +77,14 @@ class TrackedAnchorManagerCalculator : public CalculatorBase {
+     RET_CHECK(cc->Outputs().HasTag(kAnchorsTag) &&
+               cc->Outputs().HasTag(kBoxesOutputTag));
+ 
+-    cc->Inputs().Tag(kAnchorsTag).Set<std::vector<Anchor>>();
++    cc->Inputs().Tag(kAnchorsTag).Set<std::vector<StickerAnchor>>();
+     cc->Inputs().Tag(kSentinelTag).Set<int>();
+ 
+     if (cc->Inputs().HasTag(kBoxesInputTag)) {
+       cc->Inputs().Tag(kBoxesInputTag).Set<mediapipe::TimedBoxProtoList>();
+     }
+ 
+-    cc->Outputs().Tag(kAnchorsTag).Set<std::vector<Anchor>>();
++    cc->Outputs().Tag(kAnchorsTag).Set<std::vector<StickerAnchor>>();
+     cc->Outputs().Tag(kBoxesOutputTag).Set<mediapipe::TimedBoxProtoList>();
+ 
+     if (cc->Outputs().HasTag(kCancelTag)) {
+@@ -103,10 +103,10 @@ REGISTER_CALCULATOR(TrackedAnchorManagerCalculator);
+ absl::Status TrackedAnchorManagerCalculator::Process(CalculatorContext* cc) {
+   mediapipe::Timestamp timestamp = cc->InputTimestamp();
+   const int sticker_sentinel = cc->Inputs().Tag(kSentinelTag).Get<int>();
+-  std::vector<Anchor> current_anchor_data =
+-      cc->Inputs().Tag(kAnchorsTag).Get<std::vector<Anchor>>();
++  std::vector<StickerAnchor> current_anchor_data =
++      cc->Inputs().Tag(kAnchorsTag).Get<std::vector<StickerAnchor>>();
+   auto pos_boxes = absl::make_unique<mediapipe::TimedBoxProtoList>();
+-  std::vector<Anchor> tracked_scaled_anchor_data;
++  std::vector<StickerAnchor> tracked_scaled_anchor_data;
+ 
+   // Delete any boxes being tracked without an associated anchor
+   for (const mediapipe::TimedBoxProto& box :
+@@ -115,7 +115,7 @@ absl::Status TrackedAnchorManagerCalculator::Process(CalculatorContext* cc) {
+            .Get<mediapipe::TimedBoxProtoList>()
+            .box()) {
+     bool anchor_exists = false;
+-    for (Anchor anchor : current_anchor_data) {
++    for (StickerAnchor anchor : current_anchor_data) {
+       if (box.id() == anchor.sticker_id) {
+         anchor_exists = true;
+         break;
+@@ -129,8 +129,8 @@
+   }
+ 
+   // Perform tracking or updating for each anchor position
+-  for (const Anchor& anchor : current_anchor_data) {
+-    Anchor output_anchor = anchor;
++  for (const StickerAnchor& anchor : current_anchor_data) {
++    StickerAnchor output_anchor = anchor;
+     // Check if anchor position is being reset by user in this graph iteration
+     if (sticker_sentinel == anchor.sticker_id) {
+       // Delete associated tracking box
+@@ -175,7 +175,7 @@
+       // stickers to be tracked at approximately last location even if
+       // re-acquisitioning in the BoxTrackingSubgraph encounters errors
+       if (!updated_from_tracker) {
+-        for (const Anchor& prev_anchor : previous_anchor_data_) {
++        for (const StickerAnchor& prev_anchor : previous_anchor_data_) {
+           if (anchor.sticker_id == prev_anchor.sticker_id) {
+             mediapipe::TimedBoxProto* box = pos_boxes->add_box();
+             box->set_left(prev_anchor.x - kBoxEdgeSize * 0.5f);
+@@ -199,7 +199,7 @@
+ 
+   cc->Outputs()
+       .Tag(kAnchorsTag)
+-      .AddPacket(MakePacket<std::vector<Anchor>>(tracked_scaled_anchor_data)
++      .AddPacket(MakePacket<std::vector<StickerAnchor>>(tracked_scaled_anchor_data)
+                      .At(cc->InputTimestamp()));
+   cc->Outputs()
+       .Tag(kBoxesOutputTag)
+--- a/mediapipe/graphs/instant_motion_tracking/calculators/sticker_manager_calculator.cc
++++ b/mediapipe/graphs/instant_motion_tracking/calculators/sticker_manager_calculator.cc
+@@ -61,7 +61,7 @@ class StickerManagerCalculator : public CalculatorBase {
+               cc->Outputs().HasTag(kRenderDescriptorsTag));
+ 
+     cc->Inputs().Tag(kProtoDataString).Set<std::string>();
+-    cc->Outputs().Tag(kAnchorsTag).Set<std::vector<Anchor>>();
++    cc->Outputs().Tag(kAnchorsTag).Set<std::vector<StickerAnchor>>();
+     cc->Outputs().Tag(kUserRotationsTag).Set<std::vector<UserRotation>>();
+     cc->Outputs().Tag(kUserScalingsTag).Set<std::vector<UserScaling>>();
+     cc->Outputs().Tag(kRenderDescriptorsTag).Set<std::vector<int>>();
+@@ -78,7 +78,7 @@ class StickerManagerCalculator : public CalculatorBase {
+     std::string sticker_proto_string =
+         cc->Inputs().Tag(kProtoDataString).Get<std::string>();
+ 
+-    std::vector<Anchor> initial_anchor_data;
++    std::vector<StickerAnchor> initial_anchor_data;
+     std::vector<UserRotation> user_rotation_data;
+     std::vector<UserScaling> user_scaling_data;
+     std::vector<int> render_data;
+@@ -91,7 +91,7 @@
+ 
+     for (int i = 0; i < sticker_roll.sticker().size(); ++i) {
+       // Declare empty structures for sticker data
+-      Anchor initial_anchor;
++      StickerAnchor initial_anchor;
+       UserRotation user_rotation;
+       UserScaling user_scaling;
+ 
+@@ -116,7 +116,7 @@
+     if (cc->Outputs().HasTag(kAnchorsTag)) {
+       cc->Outputs()
+           .Tag(kAnchorsTag)
+-          .AddPacket(MakePacket<std::vector<Anchor>>(initial_anchor_data)
++          .AddPacket(MakePacket<std::vector<StickerAnchor>>(initial_anchor_data)
+                          .At(cc->InputTimestamp()));
+     }

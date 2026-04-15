@@ -47,11 +47,8 @@ namespace Mediapipe.Unity.Sample.Holistic
 
     public override void StartRun(ImageSource imageSource)
     {
-      if (runningMode.IsSynchronous())
-      {
-        _trackedAnchorDataStream.StartPolling();
-      }
-      // StartRun(BuildSidePacket(imageSource));
+      _trackedAnchorDataStream.StartPolling();
+      StartRun(BuildSidePacket(imageSource));
     }
 
     public override void Stop()
@@ -62,17 +59,26 @@ namespace Mediapipe.Unity.Sample.Holistic
     }
 
     private bool _isTracking;
+    private int _currentStickerSentinelId = -1;
 
+    public void ResetAnchor(float normalizedX = 0.5f, float normalizedY = 0.5f)
+    {
+      _anchors[0].stickerId = ++_currentStickerSentinelId;
+      _isTracking = false;
+      _anchors[0].x = normalizedX;
+      _anchors[0].y = normalizedY;
+      Logger.LogInfo(TAG, $"New anchor = {_anchors[0]}");
+    }
+    
     public void AddTextureFrameToInputStream(Experimental.TextureFrame textureFrame, GlContext glContext = null)
     {
       AddTextureFrameToInputStream(_InputStreamName, textureFrame, glContext);
       
-      // var stickerSentinelId = _isTracking ? -1 : _currentStickerSentinelId;
-      var stickerSentinelId = -1;// _isTracking ? -1 : _currentStickerSentinelId;
-      // AddPacketToInputStream(_StickerSentinelStreamName, Packet.CreateIntAt(stickerSentinelId, latestTimestamp));
+      var stickerSentinelId = _isTracking ? -1 : _currentStickerSentinelId;
+      AddPacketToInputStream(_StickerSentinelStreamName, Packet.CreateIntAt(stickerSentinelId, latestTimestamp));
 
       _isTracking = true;
-      // AddPacketToInputStream(_InitialAnchorDataStreamName, PacketAnchorExtension.CreateAnchorVectorAt(_anchors, latestTimestamp));
+      AddPacketToInputStream(_InitialAnchorDataStreamName, PacketAnchorExtension.CreateAnchorVectorAt(_anchors, latestTimestamp));
     }
 
     public async Task<InstantMotionTrackingResult> WaitNextAsync()
@@ -82,6 +88,7 @@ namespace Mediapipe.Unity.Sample.Holistic
 
       _ = TryGetValue(results.packet, out var anchors, (packet) =>
       {
+        Debug.Log(_anchors.Length);
         return new List<Anchor3d>();
       });
 
@@ -98,24 +105,13 @@ namespace Mediapipe.Unity.Sample.Holistic
     protected override void ConfigureCalculatorGraph(CalculatorGraphConfig config)
     {
       _trackedAnchorDataStream = new OutputStream<List<Anchor3d>>(calculatorGraph, _TrackedAnchorDataStreamName, true);
-      
-      using (var validatedGraphConfig = new ValidatedGraphConfig())
-      {
-        validatedGraphConfig.Initialize(config);
-
-        var extensionRegistry = new ExtensionRegistry() { TensorsToDetectionsCalculatorOptions.Extensions.Ext, ThresholdingCalculatorOptions.Extensions.Ext };
-        var cannonicalizedConfig = validatedGraphConfig.Config(extensionRegistry);
-        
-        calculatorGraph.Initialize(cannonicalizedConfig);
-      }
+      calculatorGraph.Initialize(config);
     }
     
     private PacketMap BuildSidePacket(ImageSource imageSource)
     {
       var sidePacket = new PacketMap();
-
       SetImageTransformationOptions(sidePacket, imageSource);
-      
       return sidePacket;
     }
   }

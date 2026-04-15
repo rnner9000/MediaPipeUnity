@@ -7,10 +7,20 @@ input_stream: "sticker_sentinel"
 input_stream: "initial_anchor_data"
 output_stream: "tracked_anchor_data"
 
+node: {
+  calculator: "ImageTransformationCalculator"
+  input_stream: "IMAGE:input_video"
+  input_side_packet: "ROTATION_DEGREES:input_rotation"
+  input_side_packet: "FLIP_HORIZONTALLY:input_horizontally_flipped"
+  input_side_packet: "FLIP_VERTICALLY:input_vertically_flipped"
+  output_stream: "IMAGE:transformed_input_video"
+}
+
 node {
   calculator: "RegionTrackingSubgraphCpu"
-  input_stream: "VIDEO:input_video"
+  input_stream: "VIDEO:transformed_input_video"
   input_stream: "SENTINEL:sticker_sentinel"
   input_stream: "ANCHORS:initial_anchor_data"
   output_stream: "ANCHORS:tracked_anchor_data"
 }
+

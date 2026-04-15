@@ -37,6 +37,7 @@ http_archive(
         "@//third_party:mediapipe_model_path.diff",
         "@//third_party:mediapipe_extension.diff",
         "@//third_party:mediapipe_workaround.diff",
+        "@//third_party:mediapipe_anchor_rename.diff",
     ],
     sha256 = "25af3c4cc44dfe929eea226ab6cd0dd53a54fbb199db877cc96aa63d0e45d745",
     strip_prefix = "mediapipe-0.10.22",

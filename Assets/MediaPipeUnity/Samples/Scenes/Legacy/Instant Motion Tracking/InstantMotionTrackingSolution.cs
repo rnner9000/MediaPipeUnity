@@ -6,6 +6,7 @@
 
 using System.Collections;
 using System.Collections.Generic;
+using Mediapipe.Unity.CoordinateSystem;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -22,6 +23,25 @@ namespace Mediapipe.Unity.Sample.Holistic
       base.Stop();
       _textureFramePool?.Dispose();
       _textureFramePool = null;
+    }
+    
+    private void Update()
+    {
+      if (Input.GetMouseButtonDown(0))
+      {
+        var rectTransform = screen.GetComponent<RectTransform>();
+
+        if (RectTransformUtility.RectangleContainsScreenPoint(rectTransform, Input.mousePosition, Camera.main))
+        {
+          if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, Input.mousePosition, Camera.main, out var localPoint))
+          {
+            var isMirrored = ImageSourceProvider.ImageSource.isFrontFacing ^ ImageSourceProvider.ImageSource.isHorizontallyFlipped;
+            var normalizedPoint = rectTransform.rect.PointToImageNormalized(localPoint, graphRunner.rotation, isMirrored);
+            graphRunner.ResetAnchor(normalizedPoint.x, normalizedPoint.y);
+            // _trackedAnchorDataAnnotationController.ResetAnchor();
+          }
+        }
+      }
     }
 
     protected override IEnumerator Run()
@@ -60,6 +80,7 @@ namespace Mediapipe.Unity.Sample.Holistic
       SetupAnnotationController(_poseDetectionAnnotationController, imageSource);
       _segmentationMaskAnnotationController.InitScreen(imageSource.textureWidth, imageSource.textureHeight);
 */
+      graphRunner.ResetAnchor();
       graphRunner.StartRun(imageSource);
 
       AsyncGPUReadbackRequest req = default;
@@ -118,6 +139,7 @@ namespace Mediapipe.Unity.Sample.Holistic
     }
     private void OnPoseDetectionOutput(object stream, OutputStream<List<Anchor3d>>.OutputEventArgs eventArgs)
     {
+      Debug.Log("hi");
       /*
       var packet = eventArgs.packet;
       var value = packet == null ? default : packet.Get(Detection.Parser);

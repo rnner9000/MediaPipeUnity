@@ -13,11 +13,11 @@
 
 extern "C" {
 
-MP_CAPI(MpReturnCode) mp__MakeAnchor3dVectorPacket__PA_i(const mediapipe::Anchor* value, int size, mediapipe::Packet** packet_out);
-MP_CAPI(MpReturnCode) mp__MakeAnchor3dVectorPacket_At__PA_i_Rt(const mediapipe::Anchor* value, int size, mediapipe::Timestamp* timestamp,
+MP_CAPI(MpReturnCode) mp__MakeAnchor3dVectorPacket__PA_i(const mediapipe::StickerAnchor* value, int size, mediapipe::Packet** packet_out);
+MP_CAPI(MpReturnCode) mp__MakeAnchor3dVectorPacket_At__PA_i_Rt(const mediapipe::StickerAnchor* value, int size, mediapipe::Timestamp* timestamp,
                                                                mediapipe::Packet** packet_out);
-MP_CAPI(MpReturnCode) mp_Packet__GetAnchor3dVector(mediapipe::Packet* packet, mp_api::StructArray<mediapipe::Anchor>* value_out);
-MP_CAPI(void) mp_Anchor3dArray__delete(mediapipe::Anchor* anchor_vector_data);
+MP_CAPI(MpReturnCode) mp_Packet__GetAnchor3dVector(mediapipe::Packet* packet, mp_api::StructArray<mediapipe::StickerAnchor>* value_out);
+MP_CAPI(void) mp_Anchor3dArray__delete(mediapipe::StickerAnchor* anchor_vector_data);
 
 }  // extern "C"
 
