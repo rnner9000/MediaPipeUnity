@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dbdf7047-91d8-41c5-903d-07eba7a3ac3f" name="Changes" comment="" />
+    <list default="true" id="dbdf7047-91d8-41c5-903d-07eba7a3ac3f" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.MediaPipeUnity/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.MediaPipeUnity/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MediaPipeUnity/Samples/Scenes/Legacy/Instant Motion Tracking/Instant Motion Tracking.unity" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MediaPipeUnity/Samples/Scenes/Legacy/Instant Motion Tracking/Instant Motion Tracking.unity" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MediaPipeUnity/Samples/Scenes/Legacy/Instant Motion Tracking/InstantMotionTrackingGraph.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MediaPipeUnity/Samples/Scenes/Legacy/Instant Motion Tracking/InstantMotionTrackingGraph.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Assets/MediaPipeUnity/Samples/Scenes/Legacy/Instant Motion Tracking/InstantMotionTrackingSolution.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Assets/MediaPipeUnity/Samples/Scenes/Legacy/Instant Motion Tracking/InstantMotionTrackingSolution.cs" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -14,6 +19,7 @@
     <option name="stateVersion" value="1" />
   </component>
   <component name="ProjectId" id="3CMsMVxw6mpThX899seDxnZkh4Y" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="autoscrollFromSource" value="true" />
   </component>
@@ -67,6 +73,7 @@
       <option name="presentableId" value="Default" />
       <updated>1776206725548</updated>
       <workItem from="1776206730446" duration="1296000" />
+      <workItem from="1776233668352" duration="2956000" />
     </task>
     <servers />
   </component>
@@ -86,5 +93,8 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
   </component>
 </project>
