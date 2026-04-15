@@ -30,24 +30,26 @@ namespace Mediapipe.Unity.Sample.Holistic
 
   public class InstantMotionTrackingGraph : GraphRunner
   {
-    /*
-    public event EventHandler<OutputStream<Detection>.OutputEventArgs> OnPoseDetectionOutput
+    public event EventHandler<OutputStream<List<Anchor3d>>.OutputEventArgs> OnPoseDetectionOutput
     {
-      add => _poseDetectionStream.AddListener(value, timeoutMicrosec);
-      remove => _poseDetectionStream.RemoveListener(value);
+      add => _trackedAnchorDataStream.AddListener(value, timeoutMicrosec);
+      remove => _trackedAnchorDataStream.RemoveListener(value);
     }
-    */
     
     private const string _InputStreamName = "input_video";
-    // private const string _PoseDetectionStreamName = "pose_detection";
+    private const string _StickerSentinelStreamName = "sticker_sentinel";
+    private const string _InitialAnchorDataStreamName = "initial_anchor_data";
+    private const string _TrackedAnchorDataStreamName = "tracked_anchor_data";
 
-    // private OutputStream<Detection> _poseDetectionStream;
+    private OutputStream<List<Anchor3d>> _trackedAnchorDataStream;
+    
+    private readonly Anchor3d[] _anchors = new Anchor3d[1];
 
     public override void StartRun(ImageSource imageSource)
     {
       if (runningMode.IsSynchronous())
       {
-        // _poseDetectionStream.StartPolling();
+        _trackedAnchorDataStream.StartPolling();
       }
       // StartRun(BuildSidePacket(imageSource));
     }
@@ -55,73 +57,47 @@ namespace Mediapipe.Unity.Sample.Holistic
     public override void Stop()
     {
       base.Stop();
-      /*
-      _poseDetectionStream?.Dispose();
-      _poseDetectionStream = null;
-      */
+      _trackedAnchorDataStream?.Dispose();
+      _trackedAnchorDataStream = null;
     }
+
+    private bool _isTracking;
 
     public void AddTextureFrameToInputStream(Experimental.TextureFrame textureFrame, GlContext glContext = null)
     {
       AddTextureFrameToInputStream(_InputStreamName, textureFrame, glContext);
+      
+      // var stickerSentinelId = _isTracking ? -1 : _currentStickerSentinelId;
+      var stickerSentinelId = -1;// _isTracking ? -1 : _currentStickerSentinelId;
+      // AddPacketToInputStream(_StickerSentinelStreamName, Packet.CreateIntAt(stickerSentinelId, latestTimestamp));
+
+      _isTracking = true;
+      // AddPacketToInputStream(_InitialAnchorDataStreamName, PacketAnchorExtension.CreateAnchorVectorAt(_anchors, latestTimestamp));
     }
 
     public async Task<InstantMotionTrackingResult> WaitNextAsync()
     {
-      return new InstantMotionTrackingResult();
-      /*
-      var results = await WhenAll(
-        _poseDetectionStream.WaitNextAsync(),
-      );
+      var results = await _trackedAnchorDataStream.WaitNextAsync();
       AssertResult(results);
 
-      _ = TryGetValue(results.Item1.packet, out var poseDetection, (packet) =>
+      _ = TryGetValue(results.packet, out var anchors, (packet) =>
       {
-        return packet.Get(Detection.Parser);
-      });
-      _ = TryGetValue(results.Item2.packet, out var poseLandmarks, (packet) =>
-      {
-        return packet.Get(NormalizedLandmarkList.Parser);
-      });
-      _ = TryGetValue(results.Item3.packet, out var faceLandmarks, (packet) =>
-      {
-        return packet.Get(NormalizedLandmarkList.Parser);
-      });
-      _ = TryGetValue(results.Item4.packet, out var leftHandLandmarks, (packet) =>
-      {
-        return packet.Get(NormalizedLandmarkList.Parser);
-      });
-      _ = TryGetValue(results.Item5.packet, out var rightHandLandmarks, (packet) =>
-      {
-        return packet.Get(NormalizedLandmarkList.Parser);
-      });
-      _ = TryGetValue(results.Item6.packet, out var poseWorldLandmarks, (packet) =>
-      {
-        return packet.Get(LandmarkList.Parser);
-      });
-      _ = TryGetValue(results.Item7.packet, out var segmentationMask, (packet) =>
-      {
-        return packet.Get();
-      });
-      _ = TryGetValue(results.Item8.packet, out var poseRoi, (packet) =>
-      {
-        return packet.Get(NormalizedRect.Parser);
+        return new List<Anchor3d>();
       });
 
-      return new HolisticTrackingResult(poseDetection, poseLandmarks, faceLandmarks, leftHandLandmarks, rightHandLandmarks, poseWorldLandmarks, segmentationMask, poseRoi);
-      */
+      return new InstantMotionTrackingResult();
     }
 
     protected override IList<WaitForResult> RequestDependentAssets()
     {
       return new List<WaitForResult> {
-        WaitForAsset("pose_detection.bytes"),
+        WaitForAsset("ssdlite_object_detection.bytes"),
       };
     }
 
     protected override void ConfigureCalculatorGraph(CalculatorGraphConfig config)
     {
-      // _poseDetectionStream = new OutputStream<Detection>(calculatorGraph, _PoseDetectionStreamName, true);
+      _trackedAnchorDataStream = new OutputStream<List<Anchor3d>>(calculatorGraph, _TrackedAnchorDataStreamName, true);
       
       using (var validatedGraphConfig = new ValidatedGraphConfig())
       {
@@ -129,56 +105,18 @@ namespace Mediapipe.Unity.Sample.Holistic
 
         var extensionRegistry = new ExtensionRegistry() { TensorsToDetectionsCalculatorOptions.Extensions.Ext, ThresholdingCalculatorOptions.Extensions.Ext };
         var cannonicalizedConfig = validatedGraphConfig.Config(extensionRegistry);
-
-        var poseDetectionCalculatorPattern = new Regex("__posedetection[a-z]+__TensorsToDetectionsCalculator$");
-        var poseTrackingCalculatorPattern = new Regex("tensorstoposelandmarksandsegmentation__ThresholdingCalculator$");
         
-        /*
-        foreach (var calculator in tensorsToDetectionsCalculators)
-        {
-          if (calculator.Options.HasExtension(TensorsToDetectionsCalculatorOptions.Extensions.Ext))
-          {
-            var options = calculator.Options.GetExtension(TensorsToDetectionsCalculatorOptions.Extensions.Ext);
-            options.MinScoreThresh = minDetectionConfidence;
-            Debug.Log($"Min Detection Confidence = {minDetectionConfidence}");
-          }
-        }
-
-*/
         calculatorGraph.Initialize(cannonicalizedConfig);
       }
     }
-/*
+    
     private PacketMap BuildSidePacket(ImageSource imageSource)
     {
       var sidePacket = new PacketMap();
 
       SetImageTransformationOptions(sidePacket, imageSource);
-
-      // TODO: refactoring
-      // The orientation of the output image must match that of the input image.
-      var isInverted = CoordinateSystem.ImageCoordinate.IsInverted(imageSource.rotation);
-      var outputRotation = imageSource.rotation;
-      var outputHorizontallyFlipped = !isInverted && imageSource.isHorizontallyFlipped;
-      var outputVerticallyFlipped = (!runningMode.IsSynchronous() && imageSource.isVerticallyFlipped) ^ (isInverted && imageSource.isHorizontallyFlipped);
-
-      if ((outputHorizontallyFlipped && outputVerticallyFlipped) || outputRotation == RotationAngle.Rotation180)
-      {
-        outputRotation = outputRotation.Add(RotationAngle.Rotation180);
-        outputHorizontallyFlipped = !outputHorizontallyFlipped;
-        outputVerticallyFlipped = !outputVerticallyFlipped;
-      }
-
-      sidePacket.Emplace("output_rotation", Packet.CreateInt((int)outputRotation));
-      sidePacket.Emplace("output_horizontally_flipped", Packet.CreateBool(outputHorizontallyFlipped));
-      sidePacket.Emplace("output_vertically_flipped", Packet.CreateBool(outputVerticallyFlipped));
-
-      Debug.Log($"outtput_rotation = {outputRotation}, output_horizontally_flipped = {outputHorizontallyFlipped}, output_vertically_flipped = {outputVerticallyFlipped}");
-
-      // sidePacket.Emplace("refine_face_landmarks", Packet.CreateBool(refineFaceLandmarks));
-
+      
       return sidePacket;
     }
-    */
   }
 }

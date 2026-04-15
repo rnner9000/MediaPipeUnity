@@ -12,7 +12,7 @@ namespace Mediapipe
   public static class PacketAnchorExtension
   {
     /// <summary>Create a packet containing a vector of <see cref="StickerAnchor"/>.</summary>
-    public static Packet<List<StickerAnchor>> CreateAnchorVector(StickerAnchor[] value)
+    public static Packet<List<StickerAnchor>> CreateAnchorVector(Anchor3d[] value)
     {
       UnsafeNativeMethods.mp__MakeAnchor3dVectorPacket__PA_i(value, value.Length, out var ptr).Assert();
       return new Packet<List<StickerAnchor>>(ptr, true);
@@ -21,7 +21,7 @@ namespace Mediapipe
     /// <summary>
     ///   Create a timestamped packet containing a vector of <see cref="StickerAnchor"/>.
     /// </summary>
-    public static Packet<List<StickerAnchor>> CreateAnchorVectorAt(StickerAnchor[] value, long timestampMicrosec)
+    public static Packet<List<StickerAnchor>> CreateAnchorVectorAt(Anchor3d[] value, long timestampMicrosec)
     {
       using var timestamp = new Timestamp(timestampMicrosec);
       UnsafeNativeMethods.mp__MakeAnchor3dVectorPacket_At__PA_i_Rt(value, value.Length, timestamp.mpPtr, out var ptr).Assert();

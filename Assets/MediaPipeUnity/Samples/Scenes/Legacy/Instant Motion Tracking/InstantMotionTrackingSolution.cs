@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT.
 
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -52,7 +53,7 @@ namespace Mediapipe.Unity.Sample.Holistic
 
       if (!runningMode.IsSynchronous())
       {
-        // graphRunner.OnPoseDetectionOutput += OnPoseDetectionOutput;
+         graphRunner.OnPoseDetectionOutput += OnPoseDetectionOutput;
       }
 
       /*
@@ -113,15 +114,15 @@ namespace Mediapipe.Unity.Sample.Holistic
           // _poseDetectionAnnotationController.DrawNow(result.poseDetection);
         }
       }
+      
     }
-
-    /*
-    private void OnPoseDetectionOutput(object stream, OutputStream<Detection>.OutputEventArgs eventArgs)
+    private void OnPoseDetectionOutput(object stream, OutputStream<List<Anchor3d>>.OutputEventArgs eventArgs)
     {
+      /*
       var packet = eventArgs.packet;
       var value = packet == null ? default : packet.Get(Detection.Parser);
       _poseDetectionAnnotationController.DrawLater(value);
+      */
     }
-    */
   }
 }

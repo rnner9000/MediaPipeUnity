@@ -15,11 +15,11 @@ namespace Mediapipe
 
     [DllImport(MediaPipeLibrary, ExactSpelling = true)]
     public static extern MpReturnCode mp__MakeAnchor3dVectorPacket__PA_i(
-      [In] StickerAnchor[] value, int size, out IntPtr packet);
+      [In] Anchor3d[] value, int size, out IntPtr packet);
 
     [DllImport(MediaPipeLibrary, ExactSpelling = true)]
     public static extern MpReturnCode mp__MakeAnchor3dVectorPacket_At__PA_i_Rt(
-      [In] StickerAnchor[] value, int size, IntPtr timestamp, out IntPtr packet);
+      [In] Anchor3d[] value, int size, IntPtr timestamp, out IntPtr packet);
 
     [DllImport(MediaPipeLibrary, ExactSpelling = true)]
     public static extern MpReturnCode mp_Packet__GetAnchor3dVector(
